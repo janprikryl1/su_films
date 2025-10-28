@@ -10,9 +10,8 @@ export const MovieList: FC = () => {
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        // Volání API s parametry stránkování
         const response = await axios.get<IMovieListResponse>(
-          "http://127.0.0.1:8000/api/movies/?page=1&limit=20"
+          "http://127.0.0.1:8000/movies/?page=1&limit=20"
         );
         setData(response.data);
         setLoading(false);

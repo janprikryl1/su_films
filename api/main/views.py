@@ -8,12 +8,12 @@ import pandas as pd
 import os
 from rest_framework import status
 from .serializers import MovieSerializer
+from pathlib import Path
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-API_DIR = os.path.dirname(CURRENT_DIR)
-DJANGO_PROJECT_DIR = os.path.dirname(API_DIR)
-PROJECT_ROOT = os.path.dirname(DJANGO_PROJECT_DIR)
-CSV_FILE_PATH = os.path.join(PROJECT_ROOT, 'tmdb_movie_data.csv') 
+BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent 
+CSV_FILENAME = 'tmdb_movie_data.csv'
+DATA_FILE_PATH = os.path.join(PROJECT_ROOT, CSV_FILENAME)
 
 # Create your views here.
 def index(request):
@@ -39,7 +39,7 @@ class MovieListView(APIView):
         try:
             # Pamatujte: Načítání celého CSV při každém GET požadavku je neefektivní
             # Pro produkční nasazení by se mělo CSV načíst pouze jednou (např. při startu serveru)
-            df = pd.read_csv(CSV_FILE_PATH)
+            df = pd.read_csv(DATA_FILE_PATH)
             movies = df.to_dict('records') # Převod Pandas DF na seznam slovníků
         except FileNotFoundError:
             return Response(
