@@ -1,3 +1,4 @@
+import json
 from django.http import HttpResponse
 from django.shortcuts import render
 from rest_framework import status, permissions
@@ -27,55 +28,101 @@ class SaveFeedback(APIView):
         #new_feedback = Feedback(title=request.data.get('title'), email=request.data.get('email'), author=request.data.get('author'), text=request.data.get('text'))
         #new_feedback.save()
         return Response(status=status.HTTP_200_OK)
-    
+
 
 class MovieListView(APIView):
-    """
-    Endpoint pro načtení a stránkování filmových dat z CSV.
-    URL: /api/movies/?page=<číslo>&limit=<limit_na_stránce>
-    """
+    try:
+        df_global = pd.read_csv(DATA_FILE_PATH)
+    except FileNotFoundError:
+        df_global = None
+
+    COLUMN_TYPES = {
+        'id': 'numeric',
+        'title': 'string',
+        'release_date': 'string',
+        'vote_average': 'numeric',
+        'vote_count': 'numeric',
+        'popularity': 'numeric',
+        'budget': 'numeric',
+        'revenue': 'numeric',
+        'runtime': 'numeric',
+        'genres': 'string',
+        'spoken_languages': 'string',
+    }
+
     def get(self, request):
-        # --- 1. Načtení a příprava dat ---
+        if self.df_global is None:
+            return Response(
+                {"detail": "CSV soubor s daty nebyl nalezen."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        df = self.df_global.copy()
+        filters_json = request.query_params.get('filters', '[]')
+
         try:
-            # Pamatujte: Načítání celého CSV při každém GET požadavku je neefektivní
-            # Pro produkční nasazení by se mělo CSV načíst pouze jednou (např. při startu serveru)
-            df = pd.read_csv(DATA_FILE_PATH)
-            movies = df.to_dict('records') # Převod Pandas DF na seznam slovníků
-        except FileNotFoundError:
+            filters = json.loads(filters_json)
+            if not isinstance(filters, list):
+                raise ValueError()
+        except (json.JSONDecodeError, ValueError):
             return Response(
-                {"detail": "CSV soubor s daty nebyl nalezen. Zkontrolujte cestu."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        except Exception as e:
-            return Response(
-                {"detail": f"Chyba při načítání dat: {e}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Chybný formát filtrů. Očekáván JSON seznam objektů."},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        # --- 2. Stránkování (Pagination) ---
-        
-        # Získání parametrů z URL
-        page = int(request.query_params.get('page', 1)) # Defaultní stránka 1
-        limit = int(request.query_params.get('limit', 20)) # Defaultní limit 20 filmů
+        for f in filters:
+            column = f.get('column')
+            operator = f.get('operator')
+            value = f.get('value')
 
-        # Výpočet rozsahů pro stránkování
+            if not all([column, operator, value is not None]) or column not in self.COLUMN_TYPES:
+                continue
+
+            col_type = self.COLUMN_TYPES.get(column)
+
+            try:
+                if col_type == 'string':
+                    col_data = df[column].astype(str)
+                    if operator == 'contains':
+                        df = df[col_data.str.contains(str(value), case=False, na=False)]
+                    elif operator == 'eq':
+                        df = df[col_data == str(value)]
+
+                elif col_type == 'numeric':
+                    numeric_col = pd.to_numeric(df[column], errors='coerce')
+                    num_value = float(value)
+
+                    if operator == 'gte':
+                        df = df[numeric_col >= num_value]
+                    elif operator == 'lte':
+                        df = df[numeric_col <= num_value]
+                    elif operator == 'eq':
+                        df = df[numeric_col == num_value]
+                    elif operator == 'gt':
+                        df = df[numeric_col > num_value]
+                    elif operator == 'lt':
+                        df = df[numeric_col < num_value]
+
+            except (ValueError, TypeError, Exception) as e:
+                print(f"Chyba při aplikaci filtru: {e}")
+                pass
+
+        total_movies = len(df)
+        movies = df.to_dict('records')
+
+        page = int(request.query_params.get('page', 1))
+        limit = int(request.query_params.get('limit', 20))
         start_index = (page - 1) * limit
         end_index = page * limit
-        total_movies = len(movies)
 
-        # Aplikace stránkování
         paginated_movies = movies[start_index:end_index]
-        
-        # --- 3. Serializace a Odeslání odpovědi ---
-        
+
         serializer = MovieSerializer(paginated_movies, many=True)
-        
-        # Vytvoření strukturované odpovědi
         response_data = {
             "total_count": total_movies,
             "page": page,
             "limit": limit,
-            "next": page * limit < total_movies, # Jednoduchá kontrola pro "další stránku"
+            "next": end_index < total_movies,
             "results": serializer.data
         }
 

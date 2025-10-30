@@ -4,9 +4,11 @@ import {queryClient} from "./utils/queryClient.ts";
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppRouter />
-    </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+          <div className="min-h-screen bg-slate-50">
+              <AppRouter/>
+          </div>
+      </QueryClientProvider>
   );
 }
 

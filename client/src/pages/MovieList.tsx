@@ -1,162 +1,248 @@
-import { useState, type FC } from "react";
-import type { IMovie } from "../utils/types/IMovie";
-import {useGetMovies} from "../utils/api/useGetMovies.ts";
-import {Skeleton} from "@/components/ui/skeleton.tsx";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card.tsx";
-import {Badge} from "@/components/ui/badge.tsx";
-import {Clock, DollarSign, Film, Star} from "lucide-react";
-import {Calendar} from "@/components/ui/calendar.tsx";
-import {Button} from "@/components/ui/button.tsx";
+import { useState, type FC, useEffect } from "react";
+import { useGetMovies } from "../utils/api/useGetMovies";
+import { Plus, X } from "lucide-react";
+import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { TableSkeleton } from "@/components/TableSkeleton.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import type { FilterCondition } from "@/utils/types/FilterCondition.ts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {movieListColumns} from "@/components/movieListColumns.tsx";
+import {filterableColumns, getColumnType, getDefaultOperator, operators} from "@/utils/filters.ts";
+import {MovieListError} from "@/components/MovieListError.tsx";
+
+const limit = 20;
 
 export const MovieList: FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const limit = 20;
-  const { isPending, error, data } = useGetMovies(currentPage, limit);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [activeFilters, setActiveFilters] = useState<FilterCondition[]>([]);
+  const [debouncedFilters, setDebouncedFilters] = useState<FilterCondition[]>([]);
 
-  if (isPending) {
-    return <div>Načítám data...</div>;
-  }
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const validFilters = activeFilters.filter(f => f.value !== "");
+      setDebouncedFilters(validFilters);
+      setCurrentPage(1);
+    }, 500);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('cs-CZ', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [activeFilters]);
+
+  const { isPending, error, data } = useGetMovies(currentPage, limit, debouncedFilters);
+  const totalPages = data ? Math.ceil(data.total_count / limit) : 1;
+
+
+  const table = useReactTable({
+    data: data?.results ?? [],
+    columns: movieListColumns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+
+  const addFilter = () => {
+    const defaultColumn = filterableColumns[0];
+    setActiveFilters([
+      ...activeFilters,
+      {
+        column: defaultColumn.id,
+        operator: getDefaultOperator(defaultColumn.id),
+        value: "",
+      },
+    ]);
   };
 
-  const formatRuntime = (minutes: number | null) => {
-    if (!minutes) return "N/A";
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+  const removeFilter = (index: number) => {
+    setActiveFilters(activeFilters.filter((_, i) => i !== index));
   };
 
-  const getRatingColor = (rating: number) => {
-    if (rating >= 8) return "bg-green-500";
-    if (rating >= 6) return "bg-yellow-500";
-    return "bg-red-500";
+  const updateFilter = <K extends keyof FilterCondition>(
+    index: number,
+    key: K,
+    value: FilterCondition[K]
+  ) => {
+    const newFilters = [...activeFilters];
+    newFilters[index][key] = value;
+
+    if (key === 'column') {
+      newFilters[index].operator = getDefaultOperator(value as string);
+    }
+
+    setActiveFilters(newFilters);
   };
 
-  if (isPending) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
-        <div className="max-w-7xl mx-auto">
-          <Skeleton className="h-12 w-64 mb-8" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[...Array(12)].map((_, i) => (
-              <Card key={i} className="bg-slate-800/50 border-slate-700">
-                <CardHeader>
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-20 w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+  if (error) {
+    return <MovieListError error={error} />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-white flex items-center gap-3 mb-2">
-              <Film className="w-8 h-8 text-blue-400" />
-              Filmová databáze
-            </h1>
-            <p className="text-slate-400">
-              Celkem {data?.total_count.toLocaleString('cs-CZ')} filmů
-            </p>
+
+            {/* --- Filter Builder UI --- */}
+            <div className="flex flex-col gap-3 mb-6">
+              {activeFilters.map((filter, index) => {
+                const columnType = getColumnType(filter.column);
+                const currentOperators = operators[columnType];
+
+                return (
+                  <div key={index} className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={filter.column}
+                      onValueChange={(val) => updateFilter(index, 'column', val)}
+                    >
+                      <SelectTrigger className="w-full sm:w-[180px] bg-white">
+                        <SelectValue placeholder="Vyberte sloupec" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filterableColumns.map(col => (
+                          <SelectItem key={col.id} value={col.id}>{col.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                     <Select
+                      value={filter.operator}
+                      onValueChange={(val) => updateFilter(index, 'operator', val)}
+                    >
+                      <SelectTrigger className="w-full sm:w-[130px] bg-white">
+                        <SelectValue placeholder="Vyberte operátor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currentOperators.map(op => (
+                          <SelectItem key={op.id} value={op.id}>{op.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Input
+                      type={columnType === 'numeric' ? 'number' : 'text'}
+                      placeholder="Zadejte hodnotu..."
+                      value={filter.value}
+                      onChange={(e) => updateFilter(index, 'value', e.target.value)}
+                      className="w-full sm:w-[200px] bg-white"
+                    />
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-500 hover:bg-red-50"
+                      onClick={() => removeFilter(index)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )
+              })}
+
+              <Button
+                variant="outline"
+                className="self-start"
+                onClick={addFilter}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Přidat filtr
+              </Button>
+            </div>
+            {/* --- Konec Filter Builder UI --- */}
+
+            <div className="text-slate-600">
+              {isPending && !data ? (
+                  <Skeleton className="h-5 w-32"/>
+              ) : (
+                  <span>Celkem {data?.total_count.toLocaleString('cs-CZ')} filmů</span>
+              )}
+            </div>
           </div>
-          <Badge variant="outline" className="border-blue-400 text-blue-400">
-            Stránka {currentPage}
-          </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {data?.results.map((movie: IMovie) => (
-            <Card
-              key={movie.id}
-              className="bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 group"
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <CardTitle className="text-white group-hover:text-blue-400 transition-colors line-clamp-2">
-                    {movie.title}
-                  </CardTitle>
-                  <div className={`${getRatingColor(movie.vote_average)} rounded-full px-2 py-1 flex items-center gap-1 shrink-0`}>
-                    <Star className="w-3 h-3 text-white fill-white" />
-                    <span className="text-white">{movie.vote_average.toFixed(1)}</span>
-                  </div>
-                </div>
-                {movie.genres && (
-                  <div className="flex flex-wrap gap-1">
-                    {movie.genres.split(',').slice(0, 2).map((genre, idx) => (
-                      <Badge key={idx} variant="secondary" className="bg-slate-700 text-slate-300 border-0">
-                        {genre.trim()}
-                      </Badge>
+        {isPending && !data ? (
+            <TableSkeleton/>
+        ) : (
+            <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow
+                          key={headerGroup.id}
+                          className="hover:bg-slate-50 bg-slate-100/50"
+                      >
+                        {headerGroup.headers.map((header) => (
+                            <TableHead key={header.id} className="font-semibold text-slate-700">
+                              {header.isPlaceholder
+                                  ? null
+                                  : flexRender(
+                                      header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
                     ))}
-                  </div>
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      data-state={row.getIsSelected() && "selected"}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-3 text-slate-700">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={movieListColumns.length}
+                      className="h-24 text-center text-slate-500"
+                    >
+                      Nebyly nalezeny žádné výsledky.
+                    </TableCell>
+                  </TableRow>
                 )}
-              </CardHeader>
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
-              <CardContent className="space-y-2 text-slate-300">
-                {movie.release_date && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    <span>{movie.release_date.substring(0, 4)}</span>
-                  </div>
-                )}
-
-                {movie.runtime && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-slate-400" />
-                    <span>{formatRuntime(movie.runtime)}</span>
-                  </div>
-                )}
-
-                {movie.budget > 0 && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-slate-400" />
-                    <span>{formatCurrency(movie.budget)}</span>
-                  </div>
-                )}
-
-                <div className="pt-2 border-t border-slate-700 flex items-center justify-between">
-                  <span className="text-slate-400">Hlasů: {movie.vote_count.toLocaleString('cs-CZ')}</span>
-                  <span className="text-slate-500">ID: {movie.id}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-center gap-4 mt-8">
+        <div className="flex items-center justify-center gap-4 mt-6">
           <Button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || isPending}
             variant="outline"
-            className="border-slate-700 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50"
+            className="disabled:opacity-50"
           >
             Předchozí
           </Button>
 
-          <span className="text-white px-4">
-            Stránka {currentPage}
+          <span className="px-4 text-slate-700">
+                Stránka {currentPage} / {totalPages > 0 ? totalPages : 1}
           </span>
 
           <Button
             onClick={() => setCurrentPage(p => p + 1)}
-            disabled={!data?.next}
+            disabled={!data?.next || isPending}
             variant="outline"
-            className="border-slate-700 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50"
+            className="disabled:opacity-50"
           >
             Další
           </Button>
