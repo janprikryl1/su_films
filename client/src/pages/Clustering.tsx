@@ -1,6 +1,6 @@
 import type {FC} from "react";
 
-export const AI: FC = () => {
+export const Clustering: FC = () => {
   return (
     <div>
       AI

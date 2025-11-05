@@ -31,8 +31,8 @@ export const Navbar: FC = () => {
               <Link to="/movie-list">
                 Filmy
               </Link>
-              <Link to="/ai">
-                AI
+              <Link to="/Clustering">
+                Clustering
               </Link>
             </div>
 
