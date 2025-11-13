@@ -9,8 +9,8 @@ load_dotenv()
 
 BEARER_TOKEN = os.getenv('BEARER_TOKEN')
 BASE_URL = "https://api.themoviedb.org/3"
-START_PAGE = 101
-PAGES_TO_ADD = 100
+START_PAGE = 201
+PAGES_TO_ADD = 500
 MAX_PAGES_TO_FETCH = START_PAGE + PAGES_TO_ADD - 1
 
 DISCOVER_DELAY = 0.5
@@ -22,23 +22,12 @@ headers = {
     "Authorization": f"Bearer {BEARER_TOKEN}"
 }
 
-
-existing_df = pd.DataFrame()
-existing_movie_ids = set()
-
-if os.path.exists(OUTPUT_FILENAME):
-    existing_df = pd.read_csv(OUTPUT_FILENAME)
-    existing_movie_ids = set(existing_df['id'].unique())
-    print(f"📂 Načteno {len(existing_df)} filmů z '{OUTPUT_FILENAME}'.")
-    print(f"   Budeme pokračovat od stránky {START_PAGE} a přidáme max. {PAGES_TO_ADD} stránek.")
-else:
-    print(f"🆕 Soubor '{OUTPUT_FILENAME}' nebyl nalezen. Začínám stahovat od stránky 1.")
-    START_PAGE = 1
-    MAX_PAGES_TO_FETCH = PAGES_TO_ADD
+existing_df = pd.read_csv(OUTPUT_FILENAME)
+existing_movie_ids = set(existing_df['id'].unique())
+print(f"Načteno {len(existing_df)} filmů z '{OUTPUT_FILENAME}'.")
+print(f"Pokračování od stránky {START_PAGE} a do {PAGES_TO_ADD} stránek.")
 
 new_movies_base_data = []
-
-print("\nFÁZE 1: Zahajuji stahování nových základních metadat.")
 
 for page in range(START_PAGE, MAX_PAGES_TO_FETCH + 1):
     discover_url = f"{BASE_URL}/discover/movie?include_adult=false&include_video=false&language=en-US&page={page}&sort_by=popularity.desc"
@@ -63,27 +52,27 @@ for page in range(START_PAGE, MAX_PAGES_TO_FETCH + 1):
                 })
                 existing_movie_ids.add(movie_id) # Přidáme nové ID, aby se neopakovalo
             
-        print(f"✅ Stránka {page} stažena. Nových filmů v tomto běhu: {len(new_movies_base_data)}")
+        print(f"Stránka {page} stažena. Nových filmů: {len(new_movies_base_data)}")
         
         if page >= data.get('total_pages', MAX_PAGES_TO_FETCH) or not results:
-             print("🛑 Dosažena poslední stránka nebo konec výsledků Discover.")
+             print("Stažena poslední stránka")
              break
         
         time.sleep(DISCOVER_DELAY) 
         
     except requests.exceptions.RequestException as e:
-        print(f"❌ Chyba FÁZE 1 (Discover) na stránce {page}: {e}")
+        print(f"Chyba na stránce {page}: {e}")
         break
 
 df_new_base = pd.DataFrame(new_movies_base_data)
 if df_new_base.empty:
-    print("ℹ️ Žádné nové filmy ke stažení. Ukončuji program.")
+    print("ℹŽádné nové filmy ke stažení.")
     exit()
 
-print(f"\nFÁZE 1 dokončena. Získáno {len(df_new_base)} NOVÝCH ID pro detailní stahování.")
+print(f"Získáno {len(df_new_base)} NOVÝCH ID pro detailní stahování.")
 
 new_details_list = []
-print("\nFÁZE 2: Zahajuji stahování detailních dat pro NOVÉ filmy.")
+print("\nZahajuji stahování detailních dat pro NOVÉ filmy.")
 
 for i, movie_id in enumerate(df_new_base['id'].unique()):
     detail_url = f"{BASE_URL}/movie/{movie_id}"
@@ -108,7 +97,7 @@ for i, movie_id in enumerate(df_new_base['id'].unique()):
         time.sleep(DETAILS_DELAY) 
         
     except requests.exceptions.RequestException as e:
-        print(f"   -> ⚠️ Chyba FÁZE 2 (Details) u ID {movie_id}: {e}")
+        print(f"   -> Chyba u ID {movie_id}: {e}")
         time.sleep(DETAILS_DELAY * 2)
         continue
 
@@ -118,7 +107,5 @@ final_df = pd.concat([existing_df, df_new_complete], ignore_index=True)
 final_df.to_csv(OUTPUT_FILENAME, index=False)
 
 print("\n" + "="*50)
-print(f"✅ HOTOVO! Nová data byla stažena a přidána do souboru: {OUTPUT_FILENAME}")
 print(f"Celkový počet řádků ve finálním CSV: {len(final_df)}")
-print(f"Přidáno filmů v tomto běhu: {len(df_new_complete)}")
-print("="*50)
+print(f"Přidáno {len(df_new_complete)} filmů.")

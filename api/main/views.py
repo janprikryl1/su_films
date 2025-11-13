@@ -1,5 +1,7 @@
 import json
-from django.http import HttpResponse
+import mimetypes
+
+from django.http import HttpResponse, Http404, FileResponse
 from django.shortcuts import render
 from rest_framework import status, permissions
 from rest_framework.views import APIView
@@ -12,13 +14,16 @@ from .serializers import MovieSerializer
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = BASE_DIR.parent 
+PROJECT_ROOT = BASE_DIR.parent
 CSV_FILENAME = 'tmdb_movie_data.csv'
 DATA_FILE_PATH = os.path.join(PROJECT_ROOT, CSV_FILENAME)
+EDA_FILE_PATH = os.path.join(PROJECT_ROOT, 'eda.ipynb')
+
 
 # Create your views here.
 def index(request):
     return HttpResponse("API of filmy_projekt")
+
 
 class SaveFeedback(APIView):
     permission_classes = (permissions.AllowAny,)
@@ -127,3 +132,41 @@ class MovieListView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class EDAFileView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    authentication_classes = ()
+
+    def get(self, request):
+        if not os.path.exists(EDA_FILE_PATH):
+            print(f"File not found at: {EDA_FILE_PATH}")
+            raise Http404("Požadovaný soubor neexistuje.")
+
+        try:
+            # 1. Získání MIME typu
+            # Pro .ipynb je to obvykle application/json nebo text/plain, ale mimetypes je spolehlivější.
+            mime_type, encoding = mimetypes.guess_type(EDA_FILE_PATH)
+            if mime_type is None:
+                # Nastavíme generický typ pro Jupyter Notebook/JSON
+                mime_type = 'application/json'
+
+                # 2. Otevření souboru v binárním režimu ('rb')
+            # I textové soubory by měly být pro FileResponse otevírány binárně
+            # pro spolehlivé odesílání přes HTTP.
+            file_handle = open(EDA_FILE_PATH, 'rb')
+
+            # Vytvoření FileResponse. Nastavíme content_type.
+            response = FileResponse(file_handle, content_type=mime_type)
+
+            # Nastavení hlavičky Content-Disposition
+            file_name = os.path.basename(EDA_FILE_PATH)
+            response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+            return response
+
+        except Exception as e:
+            # Souborový handler (file_handle) by měl být uzavřen automaticky.
+            # Pokud se zde vyskytne chyba, je to pravděpodobně chyba čtení nebo povolení.
+            print(f"Error during file processing: {e}")
+            raise Http404("Chyba při stahování souboru.")
