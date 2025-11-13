@@ -54,7 +54,7 @@ export const Index: FC = () => {
                     onClick={() => navigate('/clustering')}
                 >
                   <Filter className="size-5"/>
-                  Clustering Aplikace
+                  Clustering
                   <ArrowRight className="size-4"/>
                 </Button>
 
