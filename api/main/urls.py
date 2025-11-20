@@ -5,4 +5,5 @@ urlpatterns = [
     path("", views.index, name="index"),
     path('movies/', views.MovieListView.as_view(), name='movie-list'),
     path('eda_file/', views.EDAFileView.as_view(), name='eda_file'),
+    path('clustering/kmeans/', views.KMeansClusteringView.as_view(), name='kmeans_clustering'),
 ]

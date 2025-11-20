@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import type { IMovieListResponse } from "../types/IMovieListResponse.ts";
 import type { FilterCondition } from "../types/FilterCondition.ts";
+import {API_BASE_URL} from "@/utils/constants";
 
 export const useGetMovies = (page: number, limit: number, filters: FilterCondition[]) => {
   const { isPending, error, data } = useQuery({
@@ -9,7 +10,7 @@ export const useGetMovies = (page: number, limit: number, filters: FilterConditi
     queryFn: async () => {
       const filterString = filters.length > 0 ? JSON.stringify(filters) : undefined;
       const response = await axios.get<IMovieListResponse>(
-        "http://127.0.0.1:8000/movies/", {
+        API_BASE_URL+"movies/", {
           params: {
             page,
             limit,
