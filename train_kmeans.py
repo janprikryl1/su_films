@@ -13,7 +13,7 @@ MODEL_FILENAME = 'kmeans_pipeline.pkl'
 try:
     df = pd.read_csv(CSV_FILENAME)
 except FileNotFoundError:
-    print(f"Chyba: Soubor '{CSV_FILENAME}' nebyl nalezen. Zkontrolujte cestu.")
+    print(f"Error: File '{CSV_FILENAME}' not found.")
     exit()
 
 df[['budget', 'revenue', 'runtime']] = df[['budget', 'revenue', 'runtime']].replace(0, np.nan)
@@ -38,14 +38,10 @@ kmeans_pipeline = Pipeline(steps=[
     ('cluster', KMeans(n_clusters=n_clusters, random_state=42, n_init=10))
 ])
 
-print("Trénování K-Means pipeline...")
+print("Training K-Means pipeline...")
 X = df[numeric_features]
 kmeans_pipeline.fit(X)
-print("Trénování dokončeno.")
+print("Training finished.")
 
-try:
-    with open(MODEL_FILENAME, 'wb') as file:
-        pickle.dump(kmeans_pipeline, file)
-    print(f"Pipeline úspěšně uložena do souboru: {MODEL_FILENAME}")
-except Exception as e:
-    print(f"Chyba při ukládání: {e}")
+with open(MODEL_FILENAME, 'wb') as file:
+    pickle.dump(kmeans_pipeline, file)
