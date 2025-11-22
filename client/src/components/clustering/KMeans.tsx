@@ -11,6 +11,7 @@ import {ClusterScatterPlot} from "@/components/clustering/ClusterScatterPlot.tsx
 import {PlotlyBoxPlots} from "@/components/clustering/PlotlyBoxPlots.tsx";
 import {KMeansDescription} from "@/components/clustering/KMeansDescription.tsx";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select.tsx";
+import { Link } from "react-router-dom";
 
 const ALL_NUMERIC_FEATURES = [
     'vote_average',
@@ -168,6 +169,9 @@ export const KMeans: FC = () => {
                 </>
             )}
             <KMeansDetails results={results} selectedCluster={selectedCluster}/>
+            <Link to="/prediction-kmeans" className="mt-6 text-blue-600 underline">
+                Doporučení
+            </Link>
         </div>
     );
 };

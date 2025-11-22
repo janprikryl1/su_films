@@ -4,6 +4,7 @@ import { MovieList } from "@/pages/MovieList";
 import { Index } from "@/pages/Index";
 import {Navbar} from "@/components/Navbar.tsx";
 import {Clustering} from "@/pages/Clustering.tsx";
+import {PredictionKMEANSPanel} from "@/components/clustering/PredictionKMEANSPanel.tsx";
 
 export const AppRouter: FC = () => {
   return (
@@ -12,6 +13,7 @@ export const AppRouter: FC = () => {
         <Routes>
             <Route path="/movie-list" element={<MovieList />} />
             <Route path="/clustering" element={<Clustering />} />
+            <Route path="/prediction-kmeans" element={<PredictionKMEANSPanel />} />
             <Route path="/" element={<Index />} />
         </Routes>
     </BrowserRouter>

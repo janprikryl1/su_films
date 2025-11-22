@@ -1,6 +1,5 @@
 import json
 import mimetypes
-
 from django.http import HttpResponse, Http404, FileResponse
 from django.shortcuts import render
 from rest_framework import status, permissions
@@ -20,27 +19,19 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import MinMaxScaler
+import pickle
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
 CSV_FILENAME = 'tmdb_movie_data.csv'
 DATA_FILE_PATH = os.path.join(PROJECT_ROOT, CSV_FILENAME)
 EDA_FILE_PATH = os.path.join(PROJECT_ROOT, 'eda.ipynb')
+MODEL_KMEANS_FILENAME = 'kmeans_pipeline.pkl'
+MODEL_KMEANS_PATH = os.path.join(PROJECT_ROOT, MODEL_KMEANS_FILENAME)
 
 
-# Create your views here.
 def index(request):
     return HttpResponse("API of filmy_projekt")
-
-
-class SaveFeedback(APIView):
-    permission_classes = (permissions.AllowAny,)
-    authentication_classes = ()
-
-    def post(self, request, format=None):
-        #new_feedback = Feedback(title=request.data.get('title'), email=request.data.get('email'), author=request.data.get('author'), text=request.data.get('text'))
-        #new_feedback.save()
-        return Response(status=status.HTTP_200_OK)
 
 
 class MovieListView(APIView):
@@ -66,7 +57,7 @@ class MovieListView(APIView):
     def get(self, request):
         if self.df_global is None:
             return Response(
-                {"detail": "CSV soubor s daty nebyl nalezen."},
+                {"detail": "CSV not found."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -79,7 +70,7 @@ class MovieListView(APIView):
                 raise ValueError()
         except (json.JSONDecodeError, ValueError):
             return Response(
-                {"detail": "Chybný formát filtrů. Očekáván JSON seznam objektů."},
+                {"detail": "Invalid filter format. Expected JSON."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -117,7 +108,7 @@ class MovieListView(APIView):
                         df = df[numeric_col < num_value]
 
             except (ValueError, TypeError, Exception) as e:
-                print(f"Chyba při aplikaci filtru: {e}")
+                print(f"Error while loading filter: {e}")
                 pass
 
         total_movies = len(df)
@@ -149,7 +140,7 @@ class EDAFileView(APIView):
     def get(self, request):
         if not os.path.exists(EDA_FILE_PATH):
             print(f"File not found at: {EDA_FILE_PATH}")
-            raise Http404("Požadovaný soubor neexistuje.")
+            raise Http404("File doesn't exist.")
 
         try:
             mime_type, encoding = mimetypes.guess_type(EDA_FILE_PATH)
@@ -163,7 +154,7 @@ class EDAFileView(APIView):
 
         except Exception as e:
             print(f"Error during file processing: {e}")
-            raise Http404("Chyba při stahování souboru.")
+            raise Http404("Error while downloading file")
 
 
 class KMeansClusteringView(APIView):
@@ -201,7 +192,7 @@ class KMeansClusteringView(APIView):
         features_query = request.query_params.get('features')
         if features_query:
             numeric_features = [f.strip() for f in features_query.split(',') if f.strip()]
-        else: # Default features
+        else:  # Default features
             numeric_features = ['vote_average', 'vote_count', 'popularity', 'budget', 'revenue', 'runtime']
 
         # Data preparation
@@ -229,10 +220,8 @@ class KMeansClusteringView(APIView):
             principal_components = pca.fit_transform(X_scaled)
 
         except Exception as e:
-            return Response(
-                {"detail": f"Error while K-Means or PCA: {e}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"detail": f"Error while K-Means or PCA: {e}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Summary
         cluster_summary = df.groupby('cluster')[numeric_features].agg(['count', 'mean']).reset_index()
@@ -278,3 +267,50 @@ class KMeansClusteringView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class ClusterPredictionView(APIView):
+    def get_pipeline(self):
+        try:
+            with open(MODEL_KMEANS_PATH, 'rb') as file:
+                return pickle.load(file)
+        except FileNotFoundError:
+            raise Exception("Model pipeline not found.")
+
+    def post(self, request):
+        pipeline = self.get_pipeline()
+
+        data = request.data
+        try:
+            new_data = {
+                'vote_average': float(data.get('vote_average')),
+                'vote_count': float(data.get('vote_count', 100)),
+                'popularity': float(data.get('popularity', 50)),
+                'budget': float(data.get('budget')),
+                'revenue': float(data.get('revenue', 0)),
+                'runtime': float(data.get('runtime', 90)),
+            }
+            target_genre = data.get('genre', 'Action')
+
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid format of numeric inputs."}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = pd.DataFrame([new_data], index=[0])
+        predicted_cluster = pipeline.predict(data)[0]
+
+        try:
+            df = pd.read_csv(DATA_FILE_PATH)
+            features = ['vote_average', 'vote_count', 'popularity', 'budget', 'revenue', 'runtime']
+            df['cluster'] = pipeline.predict(df[features].fillna(0))
+
+            recommended_movies = df[
+                (df['cluster'] == predicted_cluster) &
+                (df['genres'].astype(str).str.contains(target_genre))
+                ].sample(n=3)
+
+            recommendations = recommended_movies[['title', 'vote_average', 'popularity']].to_dict('records')
+        except:
+            recommendations = []
+
+        return Response({"predicted_cluster": int(predicted_cluster), "recommendations": recommendations},
+                        status=status.HTTP_200_OK)
