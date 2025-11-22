@@ -1,11 +1,10 @@
 import json
 import mimetypes
-from django.http import HttpResponse, Http404, FileResponse
+from django.http import Http404, FileResponse
 from django.shortcuts import render
-from rest_framework import status, permissions
+from rest_framework import permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.conf import settings
 import pandas as pd
 import os
 from rest_framework import status
@@ -15,9 +14,7 @@ from pathlib import Path
 import numpy as np
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import MinMaxScaler
 import pickle
 
@@ -66,10 +63,7 @@ class MovieListView(APIView):
 
     def get(self, request):
         if self.df_global is None:
-            return Response(
-                {"detail": "CSV not found."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"detail": "CSV not found."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         df = self.df_global.copy()
         filters_json = request.query_params.get('filters', '[]')
@@ -79,10 +73,7 @@ class MovieListView(APIView):
             if not isinstance(filters, list):
                 raise ValueError()
         except (json.JSONDecodeError, ValueError):
-            return Response(
-                {"detail": "Invalid filter format. Expected JSON."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": "Invalid filter format. Expected JSON."}, status=status.HTTP_400_BAD_REQUEST)
 
         for f in filters:
             column = f.get('column')
@@ -219,13 +210,11 @@ class KMeansClusteringView(APIView):
             principal_components = pca.fit_transform(X_scaled)
 
         except Exception as e:
-            return Response({"detail": f"Error while K-Means or PCA: {e}"},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"detail": f"Error while K-Means or PCA: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Summary
         cluster_summary = df.groupby('cluster')[numeric_features].agg(['count', 'mean']).reset_index()
-        cluster_summary.columns = ['_'.join(col).strip() if col[1] else col[0] for col in
-                                   cluster_summary.columns.values]
+        cluster_summary.columns = ['_'.join(col).strip() if col[1] else col[0] for col in cluster_summary.columns.values]
 
         cluster_summary.rename(columns={'vote_average_count': 'movie_count'}, inplace=True)
         cluster_summary['cluster'] = cluster_summary['cluster'].astype(int)
@@ -234,8 +223,7 @@ class KMeansClusteringView(APIView):
         cluster_genres = []
         for cluster_id in range(n_clusters):
             cluster_data = df[df['cluster'] == cluster_id]
-            all_genres = ', '.join(cluster_data['genres'].astype(str).str.replace(r'[\[\]\"]', '', regex=True)).split(
-                ', ')
+            all_genres = ', '.join(cluster_data['genres'].astype(str).str.replace(r'[\[\]\"]', '', regex=True)).split(', ')
             all_genres = [g.strip() for g in all_genres if g.strip()]
             dominant_genre = pd.Series(all_genres).mode()[0] if all_genres else "N/A"
             cluster_genres.append({'cluster': cluster_id, 'dominant_genre': dominant_genre})
@@ -311,8 +299,7 @@ class ClusterPredictionView(APIView):
         except:
             recommendations = []
 
-        return Response({"predicted_cluster": int(predicted_cluster), "recommendations": recommendations},
-                        status=status.HTTP_200_OK)
+        return Response({"predicted_cluster": int(predicted_cluster), "recommendations": recommendations}, status=status.HTTP_200_OK)
 
 
 class DBScanClusteringView(APIView):
@@ -358,8 +345,7 @@ class DBScanClusteringView(APIView):
             principal_components = pca.fit_transform(X_scaled)
 
         except Exception as e:
-            return Response({"detail": f"Chyba při DBSCAN nebo PCA: {e}"},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"detail": f"Chyba při DBSCAN: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         clustered_df = df[df['cluster'] != -1].copy()
         noise_points = len(df[df['cluster'] == -1])
@@ -368,11 +354,9 @@ class DBScanClusteringView(APIView):
         n_clusters = len(unique_clusters)
 
         cluster_summary = clustered_df.groupby('cluster')[numeric_features].agg(['count', 'mean']).reset_index()
-        cluster_summary.columns = ['_'.join(col).strip() if col[1] else col[0] for col in
-                                   cluster_summary.columns.values]
+        cluster_summary.columns = ['_'.join(col).strip() if col[1] else col[0] for col in cluster_summary.columns.values]
 
-        cluster_summary.rename(columns={f'{numeric_features[0]}_count': 'movie_count', 'cluster': 'cluster_id'},
-                               inplace=True)
+        cluster_summary.rename(columns={f'{numeric_features[0]}_count': 'movie_count', 'cluster': 'cluster_id'}, inplace=True)
         cluster_summary['cluster_id'] = cluster_summary['cluster_id'].astype(int)
 
         cluster_genres = []

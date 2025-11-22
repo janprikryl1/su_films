@@ -89,8 +89,6 @@ export const MovieList: FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-
-            {/* --- Filter Builder UI --- */}
             <div className="flex flex-col gap-3 mb-6">
               {activeFilters.map((filter, index) => {
                 const columnType = getColumnType(filter.column);
@@ -155,7 +153,6 @@ export const MovieList: FC = () => {
                 Přidat filtr
               </Button>
             </div>
-            {/* --- Konec Filter Builder UI --- */}
 
             <div className="text-slate-600">
               {isPending && !data ? (

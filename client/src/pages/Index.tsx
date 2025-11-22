@@ -44,8 +44,7 @@ export const Index: FC = () => {
               <h1 className="mb-6">Segmentace Filmů</h1>
 
               <p className="text-xl mb-8 max-w-2xl mx-auto">
-                Pokročilá analýza a clustering filmových dat z TMDb API. Objevte skryté vzory a segmenty ve filmovém
-                průmyslu pomocí strojového učení.
+                Analýza a clustering filmových dat z TMDb API.
               </p>
 
               <div className="flex flex-wrap gap-4 justify-center">
@@ -131,10 +130,6 @@ export const Index: FC = () => {
                       <span className="mt-1">•</span>
                       <span>Distribuce žánrů a jejich popularity</span>
                     </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1">•</span>
-                      <span>Korelace mezi atributy</span>
-                    </li>
                   </ul>
                 </CardContent>
               </Card>
@@ -159,7 +154,7 @@ export const Index: FC = () => {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="mt-1">•</span>
-                      <span>Nízkorozpočtové kultovní filmy</span>
+                      <span>Nízkorozpočtové filmy</span>
                     </li>
                   </ul>
                 </CardContent>

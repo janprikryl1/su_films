@@ -11,7 +11,7 @@ export const Clustering: FC = () => {
   return (
     <div className="flex flex-col items-center justify-center">
         <div className="flex items-center space-x-2 mb-10 mt-5">
-            <h2 className="text-3xl font-bold mr-4">Vyberte metodu pro Clustering</h2>
+            <h2 className="text-3xl font-bold mr-4">Vyberte metodu pro clustering</h2>
             <Select
                 value={clusteringMethod}
                 onValueChange={(value: ClusteringMethod) => setClusteringMethod(value)}

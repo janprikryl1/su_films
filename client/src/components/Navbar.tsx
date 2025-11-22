@@ -47,8 +47,8 @@ export const Navbar: FC = () => {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>Menu</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>Filmy</DropdownMenuItem>
-                  <DropdownMenuItem>AI</DropdownMenuItem>
+                  <DropdownMenuItem><Link to="/movie-list">Filmy</Link></DropdownMenuItem>
+                  <DropdownMenuItem><Link to="/clustering">Clustering</Link></DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

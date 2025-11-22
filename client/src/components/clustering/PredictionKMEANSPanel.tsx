@@ -14,7 +14,7 @@ type RecommendedMovie = {
 export const PredictionKMEANSPanel: FC = () => {
     const [budget, setBudget] = useState('50000000');
     const [rating, setRating] = useState('7.0');
-    const [genre, setGenre] = useState('Science Fiction');
+    const [genre, setGenre] = useState('Drama');
     const [result, setResult] = useState<{predicted_cluster: number, recommendations: RecommendedMovie[]} | null>(null);
     const [loading, setLoading] = useState(false);
 
