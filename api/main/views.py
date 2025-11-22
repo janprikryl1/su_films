@@ -41,7 +41,7 @@ def get_dataframe():
     return df
 
 def index(request):
-    return HttpResponse("API of filmy_projekt")
+    return render(request, 'index.html')
 
 
 class MovieListView(APIView):
@@ -145,7 +145,6 @@ class MovieListView(APIView):
 
 class EDAFileView(APIView):
     permission_classes = (permissions.AllowAny,)
-    authentication_classes = ()
 
     def get(self, request):
         if not os.path.exists(EDA_FILE_PATH):
@@ -344,22 +343,17 @@ class DBScanClusteringView(APIView):
         X = df[numeric_features].copy()
 
         try:
-            # 2. Předzpracování
-            # DBSCAN je velmi citlivý na škálu, proto použijeme Standard Scaler
             imputer = SimpleImputer(strategy='median')
             X_imputed = imputer.fit_transform(X)
 
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X_imputed)
 
-            # 3. DBSCAN
             dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-            clusters = dbscan.fit_predict(X_scaled)  # Clusters -1 značí šum
+            clusters = dbscan.fit_predict(X_scaled)
 
             df['cluster'] = clusters
 
-            # 4. Redukce dimenze pro vizualizaci (PCA)
-            # Aplikujeme PCA na škálovaná data
             pca = PCA(n_components=2)
             principal_components = pca.fit_transform(X_scaled)
 
@@ -367,13 +361,9 @@ class DBScanClusteringView(APIView):
             return Response({"detail": f"Chyba při DBSCAN nebo PCA: {e}"},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # 5. Souhrn výsledků
-
-        # Ignorujeme hluk (cluster -1) pro výpočet průměrů shluků
         clustered_df = df[df['cluster'] != -1].copy()
         noise_points = len(df[df['cluster'] == -1])
 
-        # Identifikace unikátních shluků (kromě šumu -1)
         unique_clusters = clustered_df['cluster'].unique()
         n_clusters = len(unique_clusters)
 
@@ -385,25 +375,19 @@ class DBScanClusteringView(APIView):
                                inplace=True)
         cluster_summary['cluster_id'] = cluster_summary['cluster_id'].astype(int)
 
-        # Dominantní žánr
         cluster_genres = []
         for cluster_id in unique_clusters:
             cluster_data = df[df['cluster'] == cluster_id]
-            # Stejná logika pro extrakci žánrů
-            all_genres = ', '.join(cluster_data['genres'].astype(str).str.replace(r'[\[\]\"]', '', regex=True)).split(
-                ', ')
+            all_genres = ', '.join(cluster_data['genres'].astype(str).str.replace(r'[\[\]\"]', '', regex=True)).split(', ')
             all_genres = [g.strip() for g in all_genres if g.strip()]
             dominant_genre = pd.Series(all_genres).mode()[0] if all_genres else "N/A"
             cluster_genres.append({'cluster_id': int(cluster_id), 'dominant_genre': dominant_genre})
 
         summary_df = cluster_summary.merge(pd.DataFrame(cluster_genres), on='cluster_id', how='left')
-
-        # Film detaily a PCA data
         movies_to_serialize = df[['id', 'title', 'cluster'] + numeric_features].copy()
         pca_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2'])
         pca_df['cluster'] = clusters
 
-        # 6. Serializace (ošetření NaN/Inf)
         summary_df.replace([np.inf, -np.inf], np.nan, inplace=True)
         movies_to_serialize.replace([np.inf, -np.inf], np.nan, inplace=True)
         pca_df.replace([np.inf, -np.inf], np.nan, inplace=True)

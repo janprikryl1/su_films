@@ -95,7 +95,7 @@ const fetchDBScanResults = async (eps: number, minPts: number, features: string[
             </div>
 
             <div className="flex flex-wrap gap-4 mb-6 p-4 border rounded-md">
-                <p className="w-full font-medium mb-2">Vybrané atributy (přidat pouze numerické):</p>
+                <p className="w-full font-medium mb-2">Vybrané atributy (numerické):</p>
                 {ALL_NUMERIC_FEATURES.map(feature => (
                     <div key={feature} className="flex items-center space-x-2">
                         <input
@@ -128,11 +128,11 @@ const fetchDBScanResults = async (eps: number, minPts: number, features: string[
                     </h3>
                     <div className="flex justify-between p-4 bg-purple-50 rounded-md border border-purple-200 mb-6">
                         <p className="font-medium">
-                            Nalezeno Shluků: <span
+                            Nalezeno shluků: <span
                             className="text-lg font-bold text-purple-700">{results.n_clusters}</span>
                         </p>
                         <p className="font-medium">
-                            Počet Odlehlých Bodů (Šum): <span
+                            Počet odlehlých bodů (šum): <span
                             className="text-lg font-bold text-red-700">{results.noise_points}</span>
                         </p>
                     </div>
@@ -190,9 +190,8 @@ const fetchDBScanResults = async (eps: number, minPts: number, features: string[
                     <p className="text-lg font-semibold mt-4">Interpretace:</p>
                     <p>
                         Většina filmů je ve shluku 0, ostatní shluky jsou malé a k tomu ještě 1055 filmů bylo označeno jako šum.
-                        Filmová data tvoří jedno velké uprostřed datového prostoru, velká hodnota epsilon spojí toto jádro do jednoho obrovského shluku (právě shluk 0).
-                        Tento shluk nepředstavuje zajímavou skupinu, ale spíše průměrný a nejběžnější film.
-                        Tato situace obvykle nastává, když epsilon je příliš velká hodnota.
+                        Filmová data tvoří jedno velké jádro uprostřed datového prostoru, což způsobuje velká hodnota epsilon (právě shluk 0).
+                        Tento shluk nepředstavuje zajímavou skupinu, ale spíše průměrné a nejběžnější filmy.
                     </p>
                 </>
             )}

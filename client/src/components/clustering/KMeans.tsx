@@ -93,6 +93,7 @@ export const KMeans: FC = () => {
                 </Select>
             </div>
             <div className="flex flex-wrap gap-4 mb-6 p-4 border rounded-md">
+                <p className="w-full font-medium mb-2">Vybrané atributy (numerické):</p>
                 {ALL_NUMERIC_FEATURES.map(feature => (
                     <div key={feature} className="flex items-center space-x-2">
                         <input

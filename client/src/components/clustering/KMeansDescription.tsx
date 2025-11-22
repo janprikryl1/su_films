@@ -3,8 +3,8 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/c
 
 export const KMeansDescription:FC = () => {
     return (
-        <div className="mt-3">
-            <p className="text-lg">Popis</p>
+        <div className="mt-4">
+            <p className="text-lg font-semibold">Interpretace:</p>
             <Table>
                 <TableHeader>
                     <TableRow className="bg-gray-100">
@@ -32,7 +32,7 @@ export const KMeansDescription:FC = () => {
                     <TableRow>
                         <TableCell>3</TableCell>
                         <TableCell>Dobře hodnocené</TableCell>
-                        <TableCell>Středně velký shluk. Výrazně vyšší rozpočet a tržby než Shluk 1. Mají dobré hodnocení - typicky úspěšné akční filmy.</TableCell>
+                        <TableCell>Středně velký shluk. Výrazně vyšší rozpočet a tržby než shluk 1. Mají dobré hodnocení - typicky úspěšné akční filmy.</TableCell>
                     </TableRow>
                     <TableRow>
                         <TableCell>4</TableCell>

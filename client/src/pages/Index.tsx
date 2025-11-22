@@ -5,13 +5,14 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import {Badge} from "@/components/ui/badge.tsx";
 import {useNavigate} from "react-router-dom";
 import axios, {AxiosError} from "axios";
+import {API_BASE_URL} from "@/utils/constants";
 
 export const Index: FC = () => {
   const navigate = useNavigate();
 
   const handleDownloadEDA = async () => {
     try {
-      const response = await axios.get('http://127.0.0.1:8000/eda_file', {
+      const response = await axios.get(API_BASE_URL+'eda_file', {
         responseType: 'blob',
       });
       const blob = new Blob([response.data]);

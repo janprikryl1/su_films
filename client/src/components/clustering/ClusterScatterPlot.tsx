@@ -54,13 +54,13 @@ export const ClusterScatterPlot: FC<Props> = ({ pcaData, nClusters }) => {
             x: {
                 title: {
                     display: true,
-                    text: 'Hlavní Komponenta 1 (PC1)',
+                    text: 'PC1',
                 },
             },
             y: {
                 title: {
                     display: true,
-                    text: 'Hlavní Komponenta 2 (PC2)',
+                    text: 'PC2',
                 },
             },
         },
@@ -81,7 +81,7 @@ export const ClusterScatterPlot: FC<Props> = ({ pcaData, nClusters }) => {
     return (
         <div className="mt-8 p-4 border rounded-lg shadow-md">
             <h4 className="text-xl font-semibold mb-3">
-                Vizualizace Shluků pomocí PCA
+                Vizualizace shluků pomocí PCA
             </h4>
             <div style={{ height: '400px' }}>
                 <Scatter data={data} options={options} />
