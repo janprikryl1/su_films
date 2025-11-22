@@ -13,7 +13,7 @@ from sklearn.decomposition import PCA
 from .serializers import MovieSerializer
 from pathlib import Path
 import numpy as np
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -29,6 +29,16 @@ EDA_FILE_PATH = os.path.join(PROJECT_ROOT, 'eda.ipynb')
 MODEL_KMEANS_FILENAME = 'kmeans_pipeline.pkl'
 MODEL_KMEANS_PATH = os.path.join(PROJECT_ROOT, MODEL_KMEANS_FILENAME)
 
+
+def get_dataframe():
+    try:
+        df = pd.read_csv(DATA_FILE_PATH)
+    except FileNotFoundError:
+        return None
+
+    # Replace 0 in budget/revenue/runtime for NaN
+    df[['budget', 'revenue', 'runtime']] = df[['budget', 'revenue', 'runtime']].replace(0, np.nan)
+    return df
 
 def index(request):
     return HttpResponse("API of filmy_projekt")
@@ -160,18 +170,8 @@ class EDAFileView(APIView):
 class KMeansClusteringView(APIView):
     permission_classes = (permissions.AllowAny,)
 
-    def get_dataframe(self):
-        try:
-            df = pd.read_csv(DATA_FILE_PATH)
-        except FileNotFoundError:
-            return None
-
-        # Replace 0 in budget/revenue/runtime for NaN
-        df[['budget', 'revenue', 'runtime']] = df[['budget', 'revenue', 'runtime']].replace(0, np.nan)
-        return df
-
     def get(self, request):
-        df = self.get_dataframe()
+        df = get_dataframe()
         if df is None:
             return Response(
                 {"detail": "CSV file was not found"},
@@ -314,3 +314,112 @@ class ClusterPredictionView(APIView):
 
         return Response({"predicted_cluster": int(predicted_cluster), "recommendations": recommendations},
                         status=status.HTTP_200_OK)
+
+
+class DBScanClusteringView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request):
+        df = get_dataframe()
+        if df is None:
+            return Response({"detail": "CSV file not found"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            eps = float(request.query_params.get('eps', 0.5))
+            min_samples = int(request.query_params.get('minPts', 5))
+            if eps <= 0 or min_samples < 2:
+                raise ValueError("eps must be > 0 a minPts >= 2")
+        except ValueError as e:
+            return Response(
+                {"detail": f"Invalid parser format: {e}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        features_query = request.query_params.get('features')
+        if features_query:
+            numeric_features = [f.strip() for f in features_query.split(',') if f.strip()]
+        else:
+            numeric_features = ['vote_average', 'vote_count', 'popularity', 'budget', 'revenue', 'runtime']
+
+        X = df[numeric_features].copy()
+
+        try:
+            # 2. Předzpracování
+            # DBSCAN je velmi citlivý na škálu, proto použijeme Standard Scaler
+            imputer = SimpleImputer(strategy='median')
+            X_imputed = imputer.fit_transform(X)
+
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X_imputed)
+
+            # 3. DBSCAN
+            dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+            clusters = dbscan.fit_predict(X_scaled)  # Clusters -1 značí šum
+
+            df['cluster'] = clusters
+
+            # 4. Redukce dimenze pro vizualizaci (PCA)
+            # Aplikujeme PCA na škálovaná data
+            pca = PCA(n_components=2)
+            principal_components = pca.fit_transform(X_scaled)
+
+        except Exception as e:
+            return Response({"detail": f"Chyba při DBSCAN nebo PCA: {e}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 5. Souhrn výsledků
+
+        # Ignorujeme hluk (cluster -1) pro výpočet průměrů shluků
+        clustered_df = df[df['cluster'] != -1].copy()
+        noise_points = len(df[df['cluster'] == -1])
+
+        # Identifikace unikátních shluků (kromě šumu -1)
+        unique_clusters = clustered_df['cluster'].unique()
+        n_clusters = len(unique_clusters)
+
+        cluster_summary = clustered_df.groupby('cluster')[numeric_features].agg(['count', 'mean']).reset_index()
+        cluster_summary.columns = ['_'.join(col).strip() if col[1] else col[0] for col in
+                                   cluster_summary.columns.values]
+
+        cluster_summary.rename(columns={f'{numeric_features[0]}_count': 'movie_count', 'cluster': 'cluster_id'},
+                               inplace=True)
+        cluster_summary['cluster_id'] = cluster_summary['cluster_id'].astype(int)
+
+        # Dominantní žánr
+        cluster_genres = []
+        for cluster_id in unique_clusters:
+            cluster_data = df[df['cluster'] == cluster_id]
+            # Stejná logika pro extrakci žánrů
+            all_genres = ', '.join(cluster_data['genres'].astype(str).str.replace(r'[\[\]\"]', '', regex=True)).split(
+                ', ')
+            all_genres = [g.strip() for g in all_genres if g.strip()]
+            dominant_genre = pd.Series(all_genres).mode()[0] if all_genres else "N/A"
+            cluster_genres.append({'cluster_id': int(cluster_id), 'dominant_genre': dominant_genre})
+
+        summary_df = cluster_summary.merge(pd.DataFrame(cluster_genres), on='cluster_id', how='left')
+
+        # Film detaily a PCA data
+        movies_to_serialize = df[['id', 'title', 'cluster'] + numeric_features].copy()
+        pca_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2'])
+        pca_df['cluster'] = clusters
+
+        # 6. Serializace (ošetření NaN/Inf)
+        summary_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        movies_to_serialize.replace([np.inf, -np.inf], np.nan, inplace=True)
+        pca_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+        json_str_summary = summary_df.to_json(orient='records', double_precision=15)
+        json_str_movies = movies_to_serialize.to_json(orient='records', double_precision=15)
+        json_str_pca = pca_df.to_json(orient='records', double_precision=15)
+
+        response_data = {
+            "n_clusters": n_clusters,
+            "noise_points": noise_points,
+            "eps": eps,
+            "min_samples": min_samples,
+            "cluster_summary": json.loads(json_str_summary),
+            "movies_with_cluster": json.loads(json_str_movies),
+            "pca_data": json.loads(json_str_pca)
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)

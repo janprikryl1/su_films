@@ -133,7 +133,7 @@ export const KMeans: FC = () => {
                     />
                     {results.n_clusters === 5 && transformativeFunction === "standardScaler" && <KMeansDescription/>}
                     <h3 className="text-2xl font-semibold mb-4 mt-8 text-left">
-                        Popis nalezených Shluků (K={results.n_clusters})
+                        Popis nalezených shluků (K={results.n_clusters})
                     </h3>
                     <Table>
                         <TableHeader>

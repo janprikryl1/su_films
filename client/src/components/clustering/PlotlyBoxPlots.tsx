@@ -30,23 +30,28 @@ const FEATURE_LABELS: Record<string, string> = {
 
 const preparePlotlyData = (movies: MovieDetail[], feature: keyof MovieDetail, nClusters: number) => {
     const dataByCluster: Record<number, number[]> = {};
+
     for (let i = 0; i < nClusters; i++) {
         dataByCluster[i] = [];
     }
 
     movies.forEach(movie => {
         const value = movie[feature as keyof MovieDetail];
-        if (movie.cluster !== undefined && movie.cluster !== null && typeof value === 'number' && !isNaN(value)) {
-            dataByCluster[movie.cluster].push(value);
+        if (movie.cluster !== undefined && movie.cluster !== null && movie.cluster >= 0 && typeof value === 'number' && !isNaN(value)) {
+            if (movie.cluster < nClusters) {
+                dataByCluster[movie.cluster].push(value);
+            }
         }
     });
 
     const traces = Array.from({ length: nClusters }, (_, i) => {
+        const count = dataByCluster[i].length;
+
         return {
             y: dataByCluster[i],
-            name: `Shluk ${i}`,
+            name: `Shluk ${i} (N=${count})`,
             type: 'box' as const,
-            boxpoints: 'outliers' as const, // Show outliers
+            boxpoints: 'outliers' as const,
             marker: { color: i < 5 ? ['#ff6384', '#36a2eb', '#4bbf6b', '#ffce56', '#9966ff'][i] : 'gray' },
         };
     });
@@ -73,14 +78,14 @@ export const PlotlyBoxPlots: React.FC<PlotlyBoxPlotsProps> = ({ movies, features
                     const isLogScale = (feature === 'budget' || feature === 'revenue' || feature === 'vote_count');
 
                     return (
-                        <div key={feature} className="p-4 border rounded-lg shadow-md" style={{ height: '400px' }}>
+                        <div key={feature} className="p-4 border rounded-lg shadow-md" style={{ height: '500px' }}>
                             <Plot
                                 data={traces}
                                 layout={{
                                     title: { text: title, font: { size: 16 } },
                                     showlegend: false,
                                     autosize: true,
-                                    margin: { t: 50, b: 50, l: 50, r: 20 },
+                                    margin: { t: 50, b: 80, l: 50, r: 20 },
                                     yaxis: {
                                         title: { text: title },
                                         type: isLogScale ? 'log' : 'linear',
