@@ -72,7 +72,7 @@ if df_new_base.empty:
 print(f"Získáno {len(df_new_base)} NOVÝCH ID pro detailní stahování.")
 
 new_details_list = []
-print("\nZahajuji stahování detailních dat pro NOVÉ filmy.")
+print("\nStahování detailních dat pro NOVÉ filmy.")
 
 for i, movie_id in enumerate(df_new_base['id'].unique()):
     detail_url = f"{BASE_URL}/movie/{movie_id}"
@@ -92,12 +92,12 @@ for i, movie_id in enumerate(df_new_base['id'].unique()):
         })
         
         if (i + 1) % 50 == 0:
-            print(f"   -> Zpracováno {i + 1}/{len(df_new_base)} NOVÝCH filmů...")
+            print(f"Zpracováno {i + 1}/{len(df_new_base)} nových filmů...")
             
         time.sleep(DETAILS_DELAY) 
         
     except requests.exceptions.RequestException as e:
-        print(f"   -> Chyba u ID {movie_id}: {e}")
+        print(f"Chyba u ID {movie_id}: {e}")
         time.sleep(DETAILS_DELAY * 2)
         continue
 
